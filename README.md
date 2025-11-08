@@ -2,10 +2,13 @@
 
 
 > **Projet réalisé par :** Rawane AL ZOHBI & Halima GHANNOUM  
-> **Formation :** Systéme Embarqué – EMSE-ISMIN 2025  
+> **Filière :** Systéme Embarqué – EMSE-ISMIN 2025  
 > **Encadrants :** M.Olivier POTIN, M.Pierre Alain MOEILLIC, M.Kévin HECTOR
 
-# Partie 1 – Amélioration et Exécution du Modèle sur STM32 via Python
+## Vue d’ensemble
+
+Ce projet met en place une **chaîne complète d’IA embarquée** pour **CIFAR-10** (images 32×32×3) :  
+entraînement du modèle, export, **déploiement sur STM32L4R9AI**, **liaison UART** PC <-> STM32, **évaluation sur cible**, puis **analyse de robustesse** (attaques adversariales et **Bit-Flip Attack**).
 
 ## Objectif 
 L'objectif est de concevoir une **solution d’IA embarquée de bout en bout** pour la classification **CIFAR-10** (10 classes d’images 32×32), depuis l’entraînement du modèle jusqu’à son **déploiement sur STM32L4R9AI**, en assurant :
@@ -13,6 +16,7 @@ L'objectif est de concevoir une **solution d’IA embarquée de bout en bout** p
 - une **évaluation sur cible** (accuracy réelle),  
 - un **volet sécurité** : *adversarial examples* (PGD) et **Bit-Flip Attack** (BFA).
 Ces étapes visent à valider la compatibilité du modèle avec les contraintes embarquées et à mesurer la précision réelle obtenue sur le matériel.
+
 
 ### Architecture du dépôt
 ```
@@ -27,6 +31,7 @@ IA_Embarqué_Rawane_Halima
  ├─Code python/      #les fishiers pythons utilisés pour la communication, génération du modéle
  └── Stm Project/     #notre projet stm32
 ```
+# Partie 1 – Amélioration et Exécution du Modèle sur STM32 via Python
 
 ## Méthodologie
 
@@ -62,7 +67,7 @@ Ces caractéristiques en font une plateforme idéale pour **tester l’embarquem
 
 ---
 
-### 3. Évaluation de l’embarquipossibilité du modèle initial
+### 3. Analyse de la faisabilité du déploiement du modèle initial sur STM32
 
 Nous avons d’abord tenté d’évaluer la faisabilité du déploiement du modèle original sur notre STM32L4R9AI.  
 Les résultats de **STM32Cube.AI** ont révélé :
@@ -161,7 +166,7 @@ L’inférence embarquée est donc fluide, fiable, et conforme à la performance
 ---
 
 ## Résultats
-![resultat analyse STM](images/resultat.png)
+![resultat analyse STM](assets/resultat_analyse_STM.jpg)
 ![synchronization_python](assets/synchronization_python.jpg)
 
 Les résultats montrent une excellente cohérence entre les inférences du modèle embarqué et celles du modèle original entraîné sur PC.  
@@ -172,53 +177,55 @@ La précision finale obtenue est de 89 %, confirmant :
 
 
 
-# Partie 2 — Bit-Flip Attack & Attaque Adversariale sur CNN (CIFAR-10)
+# Partie 2 — Sécurité :Bit-Flip Attack & Attaque Adversariale sur CNN (CIFAR-10)
 
 ##  Objectif
-Nous allons appliquer sur notre modèle **CNN entraîné sur CIFAR-10** deux types d'attaques pour évaluer la robustesse :  
+Dans cette deuxième partie, notre objectif est d’évaluer la robustesse du modèle VGG11 compact (déployé sur STM32L4R9AI)
+ face à deux classes d’attaques distinctes :
 - un **Bit-Flip Attack (BFA)** *(attaque sur les poids quantifiés)*,  
 - et une **attaque adversariale** *(attaque sur les images d'entrée)*.
 
 ---
+### Modèle et données
+- Modèle : VGG11 compact entraîné sur CIFAR-10, sauvegardé sous `CIFAR10_VGG11_simple.h5`.  
+- Prétraitement : normalisation des images en **[0,1]** (`/255.0`).  
+- Mesure principale : **accuracy** sur l’ensemble de test (10 000 images).
 
-##  Qu'est-ce que le Bit-Flip Attack ?
+
+###  Qu'est-ce que le Bit-Flip Attack ?
 Le **Bit-Flip Attack (BFA)** est une attaque matérielle/logicielle visant les poids quantifiés d'un réseau de neurones.  
 En modifiant un petit nombre de bits sensibles dans la représentation binaire des poids,  
 l'attaquant peut fortement dégrader la précision du modèle — parfois avec très peu de flips.
-
----
-
-##  Notre protocole
-- **Modèle cible** : notre CNN personnalisé entraîné sur **CIFAR-10**.  
-- **Quantification** : poids quantifiés sur **8 bits**.  
-- **Attaque (BFA)** : exécution de l'algorithme BFA sur les poids quantifiés et mesure de la chute d'exactitude sur le jeu de test.
-
-
----
-
-##  Paramètres que nous allons faire varier
+- Mesures relevées : loss avant/après chaque itération, poids ciblés, nombre cumulé de bit-flips, distance de Hamming, accuracy test en fonction du nombre de flips.
+####  Paramètres que nous allons faire varier
 Nous testerons l’impact de trois variables de configuration du modèle :  
 
 - **`lr`** — learning rate utilisé pendant l’entraînement.  
 - **`clipping_value`** — valeur de clipping appliquée aux poids.  
 - **`randbet`** — flag binaire pour activer/désactiver la protection RandBET.
-
 Nous exécuterons la BFA sur les différentes combinaisons de ces paramètres afin de comparer la robustesse des modèles.
+
 
 ---
 
-##  Attaques adversariales
-L’attaque adversariale consiste à ajouter à l’image d’entrée une **perturbation spécialement conçue** — optimisée pour maximiser la perte du modèle sous une contrainte de norme. Autrement dit, **ce n’est pas du bruit aléatoire** : c’est une modification calculée pour tromper le modèle.
+###  Attaques adversariales
+L’attaque adversariale consiste à ajouter à l’image d’entrée une **perturbation spécialement conçue** 
+— optimisée pour maximiser la perte du modèle sous une contrainte de norme.
+ Autrement dit, **ce n’est pas du bruit aléatoire** : c’est une modification calculée pour tromper le modèle.
+- Configurations PGD explorées (exemples représentatifs) :
+  - `iters=40, step=0.01` (référence fournie par l’encadrant),  
+  - `iters=20, step=0.01`, `iters=40, step=0.005`, `iters=80, step=0.01`, `iters=100, step=0.01`, `iters=200, step=0.01`, et variantes `step=0.05` pour comparaison.  
+- Pour chaque configuration, nous écrivons la précision sur tout le jeu de test et sauvegardons des exemples visuels (clean vs adv).
 
-###  Paramètres d’attaque à balayer
+---
+
+####  Paramètres d’attaque à balayer
 - **`step`** — amplitude du pas de mise à jour 
 *.  
 - **`iterations`** — nombre d’itérations de la méthode .
 
-
 ---
-
-##  Résultats 
+##  Fishiers utilisés: 
 
  **Fichiers utiles :**
 - `train_cnn.py` — entraînement du modèle avec paramètres `lr`, `clipping_value`, `randbet`.  
@@ -226,6 +233,74 @@ L’attaque adversariale consiste à ajouter à l’image d’entrée une **pert
 - `adversarial_example.ipynb` — notebook d’expérimentation des attaques adversariales (paramètres `step` et `iterations`).  
 
 ---
+
+## Résultats (extraits représentatifs)
+
+### Bit-Flip Attack (BFA)
+- Le graphique `bit_flip_attack_graph.jpg` synthétise l’effet d’un nombre croissant de bit-flips sur l’accuracy pour plusieurs variantes du modèle (nominal, lr=0.01, clipping=0.1, randbet+clipping).  
+- Observations :
+  - Modèles **non protégés** : chute très rapide — quelques dizaines de flips suffisent pour réduire la précision à ~10–20 %.  
+  - **Clipping** des poids ralentit fortement la dégradation.  
+  - Ces résultats valident que des protections simples sur les poids réduisent sensiblement la vulnérabilité aux BFA.
+<div align="center">
+  <img src="assets/bit_flip_attack_graph.jpg" alt="BFA accuracy vs bit-flips" style="width:75%; max-width:900px; display:block; margin:8px auto;">
+  <p style="font-size:0.95em; color:#555; margin-top:4px; margin-bottom:12px;"><em>Figure — Evolution de l'accuracy (%) en fonction du nombre de bit-flips pour plusieurs variantes du modèle (nominal, lr=0.01, clipping=0.1, randbet+clipping).</em></p>
+</div>
+
+### Attaques adversariales (PGD / FGSM)
+- **Clean accuracy (baseline)** : ~ **82 %** sur l’ensemble de test.  
+- **FGSM ** : chute nette de la précision (valeur observée variable selon batch).  
+- **PGD (ex : iters=40, step=0.01)** : très efficace — la précision tombe souvent en dessous de 10–15 % sur l’ensemble de test pour notre modèle non-protégé.  
+- Effet des paramètres : augmenter les itérations (à pas identique) ou diminuer le pas (`step`) tout en augmentant les itérations aboutit à des attaques plus stables et souvent plus destructrices.(on a essayé plusieurs valeurs de step {0.01,0.05} et d'itération{20,40,100,200})
+  - `adv_100iter_0.01step.PNG`, `adv_200iter_0.01step.PNG` — attaques plus longues montrant une dégradation supplémentaire.  
+  - `adv_40iter_0.05step.PNG` — pas plus grand : résultats moins stables (parfois moins efficace numériquement).
+Ci-dessous quelques exemples ; **toutes les autres images** sont disponibles dans le dossier `assets/`.
+
+<div align="center">
+  <figure style="display:inline-block; margin:10px; text-align:center;">
+    <img src="assets/adv_40iter_0.01step.PNG" alt="PGD 40x0.01" style="width:300px; max-width:30vw; display:block;">
+    <figcaption style="font-size:0.9em; color:#444; margin-top:6px;">PGD — 40 iters, step=0.01 (réf)</figcaption>
+  </figure>
+
+  <figure style="display:inline-block; margin:10px; text-align:center;">
+    <img src="assets/adv_100iter_0.01step.PNG" alt="PGD 100x0.01" style="width:300px; max-width:30vw; display:block;">
+    <figcaption style="font-size:0.9em; color:#444; margin-top:6px;">PGD — 100 iters, step=0.01</figcaption>
+  </figure>
+  <figure style="display:inline-block; margin:10px; text-align:center;">
+    <img src="assets/adv_40iter_0.05step.PNG" alt="PGD 200x0.01" style="width:300px; max-width:30vw; display:block;">
+    <figcaption style="font-size:0.9em; color:#444; margin-top:6px;">PGD — 200 iters, step=0.01</figcaption>
+  </figure>
+  <figure style="display:inline-block; margin:10px; text-align:center;">
+    <img src="assets/adv_200iter_0.01step.PNG" alt="PGD 200x0.01" style="width:300px; max-width:30vw; display:block;">
+    <figcaption style="font-size:0.9em; color:#444; margin-top:6px;">PGD — 200 iters, step=0.01</figcaption>
+  </figure>
+   <figure style="display:inline-block; margin:10px; text-align:center;">
+    <img src="assets/Res_adv_200iter_0.01step.PNG" alt="PGD 200x0.01" style="width:300px; max-width:30vw; display:block;">
+    <figcaption style="font-size:0.9em; color:#444; margin-top:6px;">PGD — 200 iters, step=0.01</figcaption>
+  </figure>
+  <figure style="display:inline-block; margin:10px; text-align:center;">
+    <img src="assets/RES_adv_100iter_0.01step.PNG" alt="PGD 200x0.01" style="width:300px; max-width:30vw; display:block;">
+    <figcaption style="font-size:0.9em; color:#444; margin-top:6px;">PGD — 200 iters, step=0.01</figcaption>
+  </figure>
+  <figure style="display:inline-block; margin:10px; text-align:center;">
+    <img src="assets/Res_adv_200iter_0.05step.PNG" alt="PGD 200x0.01" style="width:300px; max-width:30vw; display:block;">
+    <figcaption style="font-size:0.9em; color:#444; margin-top:6px;">PGD — 200 iters, step=0.01</figcaption>
+  </figure>
+</div>
+
+
+**Interprétation courte** : PGD est plus puissant que FGSM (comme attendu). Les hyperparamètres (`iters`, `step`) permettent de contrôler la « finesse » versus la « force » de l’attaque — choisir un petit step et plus d’itérations tend à maximiser la perte.
+
+---
+## Analyse comparative — BFA vs attaques d’entrée
+- **Nature de l’attaque** :
+  - BFA altère la mémoire (poids) : attaque persistante, spécialement critique pour les systèmes embarqués sans protections matérielles.  
+  - PGD/FGSM altèrent les entrées : souvent détectables par des filtres ou défenses d’entrée, mais elles restent efficaces sur des modèles non-robustes.
+- **Impact observé** : pour notre configuration, la BFA peut provoquer une dégradation au moins aussi dramatique que PGD, parfois plus prononcée selon le nombre de flips ciblés et les couches attaquées.
+- **Contre-mesures pratiques** : clipping des poids, entraînement robuste (RandBET / adversarial training), et protections matérielles (ECC, Hamming) sur la mémoire.
+
+---
+
 ## Installation
 
 **Prérequis**
@@ -249,21 +324,14 @@ venv\Scripts\activate        # sous Windows
 
 ```
 ### Utilisation
+Pour lancer les différents fichiers, il suffit de suivre un enchaînement logique :  
+1. **Entraînement** → exécuter `cifar10_model.py` afin de générer le modèle optimisé (`.h5`) et les jeux de test associés (`.npy`).  
+2. **Déploiement** → importer ce modèle dans **STM32Cube.AI** pour générer le code C et le compiler sur la carte via **STM32CubeIDE**.  
+3. **Évaluation embarquée** → exécuter le script `Communication.py` sur PC pour établir la liaison UART et comparer les prédictions PC / STM32 en temps réel.  
+4. **Analyse de robustesse** → enfin, lancer les scripts ou notebooks du volet sécurité (attaques **adversariales** et **Bit-Flip Attack**) afin d’évaluer la résistance du modèle aux perturbations logicielles et matérielles.
 
-- **Exécution côté Python (PC hôte)**  
-  Le script `cifar10_model.py` permet d’entraîner et d’évaluer notre modèle CNN sur le jeu de données **CIFAR-10**.  
-  Une fois l’entraînement terminé, le modèle est sauvegardé au format **`.h5`** (`CIFAR10_VGG11_simple.h5`) ainsi que les fichiers de test `CIFAR10_xtest.npy` et `CIFAR10_ytest.npy`.
-
-- **Déploiement sur STM32 (partie embarquée)**  
-  Le modèle `.h5` est importé dans **STM32Cube.AI**, qui génère automatiquement le code C correspondant (`app_x-cube-ai.c`, `cifar10_data.c`, etc.).  
-  Ce code est ensuite intégré et compilé dans **STM32CubeIDE** pour exécuter le modèle directement sur la carte **STM32L4R9AI**.
-
-- **Communication UART (liaison PC <-> STM32)**  
-  Le script Python `Communication.py` établit une communication série (UART) avec la carte.  
-  Il envoie les images CIFAR-10 normalisées (32×32×3) vers le STM32, récupère les prédictions du modèle embarqué, puis affiche l’**accuracy** obtenue côté PC.  
-  Cette liaison permet de comparer en temps réel les performances du modèle embarqué et du modèle original entraîné sur PC.
-
-- **Volet sécurité (analyse de robustesse)**  
+Chaque fichier est autonome et documenté en début de script. En suivant cet ordre, on peut reproduire l’intégralité du flux — de l’apprentissage à la validation embarquée — tout en observant l’impact des attaques sur les performances du modèle.
+ 
 
 ---
 
